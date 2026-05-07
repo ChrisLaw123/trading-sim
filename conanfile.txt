@@ -1,0 +1,13 @@
+[requires]
+libpqxx/7.9.0
+crowcpp-crow/1.2.0
+nlohmann_json/3.11.3
+libcurl/8.6.0
+gtest/1.14.0
+
+[generators]
+CMakeDeps
+CMakeToolchain
+
+[options]
+libcurl/*:with_ssl=openssl
