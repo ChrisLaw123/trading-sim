@@ -11,6 +11,12 @@
 #include "feed/PriceFeed.h"
 #include "api/Validator.h"
 
+inline crow::response make_response(int status, const std::string& body) {
+    crow::response res(status, body);
+    res.add_header("Access-Control-Allow-Origin", "*");
+    return res;
+}
+
 inline void setup_routes(crow::SimpleApp& app, Database& db, PriceFeed& feed) {
 
     UserRepository users(db);
@@ -19,25 +25,21 @@ inline void setup_routes(crow::SimpleApp& app, Database& db, PriceFeed& feed) {
     TradeRepository trades(db);
     TradeEngine engine(db);
 
-    app.after_handle([](crow::request&, crow::response& res) {
-        res.add_header("Access-Control-Allow-Origin", "*");
-    });
-
     CROW_ROUTE(app, "/api/users/register").methods("POST"_method)
     ([&](const crow::request& req) {
         auto body = nlohmann::json::parse(req.body, nullptr, false);
         if (body.is_discarded()) {
-            return crow::response(400, R"({"error":"Invalid JSON"})");
+            return make_response(400, R"({"error":"Invalid JSON"})");
         }
 
         std::string username = body.value("username", "");
 
         if (username.empty()) {
-            return crow::response(400, R"({"error":"Username required"})");
+            return make_response(400, R"({"error":"Username required"})");
         }
 
         if (!Validator::is_valid_username(username)) {
-            return crow::response(400, R"({"error":"Invalid username"})");
+            return make_response(400, R"({"error":"Invalid username"})");
         }
 
         try {
@@ -47,14 +49,14 @@ inline void setup_routes(crow::SimpleApp& app, Database& db, PriceFeed& feed) {
             res["id"]       = user.id;
             res["username"] = user.username;
 
-            return crow::response(201, res.dump());
+            return make_response(201, res.dump());
 
         } catch (const std::runtime_error& e) {
-            return crow::response(409, R"({"error":"Username already taken"})");
+            return make_response(409, R"({"error":"Username already taken"})");
 
         } catch (const std::exception& e) {
             std::cerr << "Register error: " << e.what() << "\n";
-            return crow::response(500, R"({error":"Internal server error"})");
+            return make_response(500, R"({"error":"Internal server error"})");
         }
     });
 
@@ -78,10 +80,10 @@ inline void setup_routes(crow::SimpleApp& app, Database& db, PriceFeed& feed) {
                 res.push_back(item);
             }
         
-            return crow::response(200, res.dump());
+            return make_response(200, res.dump());
         } catch (const std::exception& e) {
             std::cerr << "Prices error: " << e.what() << "\n";
-            return crow::response(500, R"({"error":"Internal server error"})");
+            return make_response(500, R"({"error":"Internal server error"})");
         }
     });
 
@@ -91,7 +93,7 @@ inline void setup_routes(crow::SimpleApp& app, Database& db, PriceFeed& feed) {
             auto body = nlohmann::json::parse(req.body, nullptr, false);
 
             if (body.is_discarded()) {
-                return crow::response(400, R"({"error":"Invalid JSON"})");
+                return make_response(400, R"({"error":"Invalid JSON"})");
             }
 
             std::string user_id = body.value("user_id","");
@@ -100,7 +102,7 @@ inline void setup_routes(crow::SimpleApp& app, Database& db, PriceFeed& feed) {
             double shares = body.value("shares",0.0);
 
             if (user_id.empty() || symbol.empty() || side.empty() || shares == 0) {
-                return crow::response(400, R"({"error":"Missing inputs"})");
+                return make_response(400, R"({"error":"Missing inputs"})");
             }
 
             auto result = engine.execute(user_id, symbol, side, shares);
@@ -113,16 +115,16 @@ inline void setup_routes(crow::SimpleApp& app, Database& db, PriceFeed& feed) {
                 res["total_cost"]   = result.total_cost;
                 res["new_balance"]  = result.new_balance;
 
-                return crow::response(200, res.dump());
+                return make_response(200, res.dump());
             } else {
                 nlohmann::json err;
                 err["success"] = result.success;
                 err["message"] = result.message;
-                return crow::response(400, err.dump()); 
+                return make_response(400, err.dump()); 
             }
         } catch (const std::exception& e) {
             std::cerr << "Trade error: " << e.what() << "\n";
-            return crow::response(500, R"({"error":"Internal server error"})"); 
+            return make_response(500, R"({"error":"Internal server error"})"); 
         }
     });
 
@@ -130,12 +132,12 @@ inline void setup_routes(crow::SimpleApp& app, Database& db, PriceFeed& feed) {
     ([&](const crow::request& req, const std::string& user_id) {
         try {
             if (!Validator::is_valid_uuid(user_id)) {
-                return crow::response(400, R"({"error":"Invalid user id"})");
+                return make_response(400, R"({"error":"Invalid user id"})");
             }
 
             auto user_opt = users.find_by_id(user_id);
             if (!user_opt) {
-                return crow::response(404, R"({"error":"User not found"})");
+                return make_response(404, R"({"error":"User not found"})");
             }
             auto user = *user_opt;
 
@@ -173,11 +175,11 @@ inline void setup_routes(crow::SimpleApp& app, Database& db, PriceFeed& feed) {
             res["pnl"]          = user.balance + equity - 100000.0;
             res["holdings"]     = holdings_array;
 
-            return crow::response(200, res.dump());
+            return make_response(200, res.dump());
 
         } catch (const std::exception& e) {
             std::cerr << "Portfolio error: " << e.what() << "\n";
-            return crow::response(500, R"({"error":"Internal server error"})");
+            return make_response(500, R"({"error":"Internal server error"})");
         }
     });
 
@@ -185,7 +187,7 @@ inline void setup_routes(crow::SimpleApp& app, Database& db, PriceFeed& feed) {
     ([&](const crow::request& req, const std::string& user_id) {
         try {
             if (!Validator::is_valid_uuid(user_id)) {
-                return crow::response(400, R"({"error":"Invalid user id"})");
+                return make_response(400, R"({"error":"Invalid user id"})");
             }
 
             auto trade_history = trades.get_by_user(user_id);
@@ -206,11 +208,11 @@ inline void setup_routes(crow::SimpleApp& app, Database& db, PriceFeed& feed) {
                 history_array.push_back(item);
             }
 
-            return crow::response(200, history_array.dump());
+            return make_response(200, history_array.dump());
 
         } catch (const std::exception& e) {
             std::cerr << "History error: " << e.what() << "\n";
-            return crow::response(500, R"({"error":"Internal server error"})");
+            return make_response(500, R"({"error":"Internal server error"})");
         }
     });
 
@@ -239,11 +241,11 @@ inline void setup_routes(crow::SimpleApp& app, Database& db, PriceFeed& feed) {
                 rank++;
             }
 
-            return crow::response(200, res.dump());
+            return make_response(200, res.dump());
 
         } catch (const std::exception& e) {
             std::cerr << "Leaderboard error: " << e.what() << "\n";
-            return crow::response(500, R"({"error":"Internal server error"})");
+            return make_response(500, R"({"error":"Internal server error"})");
         }
     });
 }
