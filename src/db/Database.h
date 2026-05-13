@@ -15,6 +15,9 @@ public:
         }
     }
 
+    Database(const Database&) = delete;
+    Database& operator=(const Database&) = delete;
+
     pqxx::connection& conn() {
         return *conn_;
     }

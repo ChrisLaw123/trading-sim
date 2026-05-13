@@ -45,11 +45,11 @@ int main() {
         price_thread.detach();
 
         crow::SimpleApp app;
-        setup_routes(app, db, feed);
+        setup_routes(app, config.db_connection_string(), feed);
 
         std::cout << "Starting up\n";
 
-        app.port(8080).multithreaded().run();
+        app.port(8080).run();
         return 0;
 
     } catch (const std::exception& e) {

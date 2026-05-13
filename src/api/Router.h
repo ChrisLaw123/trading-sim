@@ -17,16 +17,12 @@ inline crow::response make_response(int status, const std::string& body) {
     return res;
 }
 
-inline void setup_routes(crow::SimpleApp& app, Database& db, PriceFeed& feed) {
-
-    UserRepository users(db);
-    PriceRepository prices(db);
-    HoldingRepository holdings(db);
-    TradeRepository trades(db);
-    TradeEngine engine(db);
+inline void setup_routes(crow::SimpleApp& app, const std::string& conn_string, PriceFeed& feed) {
 
     CROW_ROUTE(app, "/api/users/register").methods("POST"_method)
-    ([&](const crow::request& req) {
+    ([conn_string](const crow::request& req) {
+        Database db(conn_string);
+        UserRepository users(db);
         auto body = nlohmann::json::parse(req.body, nullptr, false);
         if (body.is_discarded()) {
             return make_response(400, R"({"error":"Invalid JSON"})");
@@ -61,7 +57,9 @@ inline void setup_routes(crow::SimpleApp& app, Database& db, PriceFeed& feed) {
     });
 
     CROW_ROUTE(app, "/api/prices")
-    ([&]() {
+    ([conn_string, &feed]() {
+        Database db(conn_string);
+        PriceRepository prices(db);
         try {
             auto fetched = feed.fetch_prices();
 
@@ -88,7 +86,9 @@ inline void setup_routes(crow::SimpleApp& app, Database& db, PriceFeed& feed) {
     });
 
     CROW_ROUTE(app, "/api/trade").methods("POST"_method)
-    ([&](const crow::request& req) {
+    ([conn_string](const crow::request& req) {
+        Database db(conn_string);
+        TradeEngine engine(db);
         try {
             auto body = nlohmann::json::parse(req.body, nullptr, false);
 
@@ -129,7 +129,11 @@ inline void setup_routes(crow::SimpleApp& app, Database& db, PriceFeed& feed) {
     });
 
     CROW_ROUTE(app, "/api/portfolio/<string>")
-    ([&](const crow::request& req, const std::string& user_id) {
+    ([conn_string](const crow::request& req, const std::string& user_id) {
+        Database db(conn_string);
+        UserRepository users(db);
+        PriceRepository prices(db);
+        HoldingRepository holdings(db);
         try {
             if (!Validator::is_valid_uuid(user_id)) {
                 return make_response(400, R"({"error":"Invalid user id"})");
@@ -184,7 +188,9 @@ inline void setup_routes(crow::SimpleApp& app, Database& db, PriceFeed& feed) {
     });
 
     CROW_ROUTE(app, "/api/history/<string>")
-    ([&](const crow::request& req, const std::string& user_id) {
+    ([conn_string](const crow::request& req, const std::string& user_id) {
+        Database db(conn_string);
+        TradeRepository trades(db);
         try {
             if (!Validator::is_valid_uuid(user_id)) {
                 return make_response(400, R"({"error":"Invalid user id"})");
@@ -217,7 +223,9 @@ inline void setup_routes(crow::SimpleApp& app, Database& db, PriceFeed& feed) {
     });
 
     CROW_ROUTE(app, "/api/leaderboard")
-    ([&]() {
+    ([conn_string]() {
+        Database db(conn_string);
+        UserRepository users(db);
         try {
             auto board = users.leaderboard();
 
