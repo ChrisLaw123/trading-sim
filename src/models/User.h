@@ -6,4 +6,5 @@ struct User {
     std::string username;
     double      balance;
     std::string created_at;
+    std::string password_hash;
 };

@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trading Sim</title>
+
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lightweight-charts@3.8.0/dist/lightweight-charts.standalone.production.js"></script>
+
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #0d1117;
+            color: #e6edf3;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #root { height: 100vh; display: flex; flex-direction: column; }
+
+        .header {
+            background: #161b22;
+            padding: 12px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #30363d;
+        }
+
+        .header h1 { font-size: 20px; color: #58a6ff; }
+
+        .main-layout {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 280px;
+            background: #161b22;
+            border-right: 1px solid #30363d;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            padding: 16px;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .chart-container {
+            height: 400px;
+            background: #161b22;
+            border-bottom: 1px solid #30363d;
+            padding: 16px;
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .bottom-panels {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .panel {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            border-right: 1px solid #30363d;
+        }
+
+        .panel:last-child { border-right: none; }
+
+        .stock-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-bottom: 4px;
+        }
+
+        .stock-item:hover { background: #21262d; }
+        .stock-item.active { background: #1f3a5c; }
+
+        .stock-symbol { font-weight: bold; font-size: 14px; }
+        .stock-price { color: #58a6ff; font-size: 14px; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        th, td {
+            padding: 8px 10px;
+            text-align: left;
+            border-bottom: 1px solid #21262d;
+        }
+
+        th { color: #8b949e; font-weight: normal; }
+
+        input, select {
+            width: 100%;
+            padding: 8px 12px;
+            margin: 6px 0;
+            background: #0d1117;
+            color: #e6edf3;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            margin: 4px 0;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .btn-buy { background: #238636; color: white; }
+        .btn-buy:hover { background: #2ea043; }
+        .btn-sell { background: #da3633; color: white; }
+        .btn-sell:hover { background: #f85149; }
+        .btn-primary { background: #1f6feb; color: white; }
+        .btn-primary:hover { background: #388bfd; }
+        .btn-secondary { background: #21262d; color: #e6edf3; }
+        .btn-secondary:hover { background: #30363d; }
+        .btn-active { border-bottom: 2px solid #58a6ff; }
+
+        .green { color: #3fb950; }
+        .red { color: #f85149; }
+
+        .stat-box {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 8px;
+        }
+
+        .stat-label { font-size: 11px; color: #8b949e; margin-bottom: 4px; }
+        .stat-value { font-size: 18px; font-weight: bold; }
+
+        .section-title {
+            font-size: 13px;
+            color: #8b949e;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin: 16px 0 8px;
+        }
+
+        .highlight { background: #1f3a5c; }
+
+        .register-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: #0d1117;
+        }
+
+        .register-box {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 12px;
+            padding: 40px;
+            width: 360px;
+        }
+
+        .register-box h1 {
+            text-align: center;
+            color: #58a6ff;
+            margin-bottom: 8px;
+        }
+
+        .register-box p {
+            text-align: center;
+            color: #8b949e;
+            margin-bottom: 24px;
+            font-size: 14px;
+        }
+
+        .mode-toggle {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #30363d;
+        }
+
+        .mode-btn {
+            flex: 1;
+            background: none;
+            color: #8b949e;
+            border: none;
+            border-bottom: 2px solid transparent;
+            border-radius: 0;
+            padding: 10px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .mode-btn.active {
+            color: #e6edf3;
+            border-bottom-color: #58a6ff;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const API = "http://172.19.34.194:8080";
+
+        function RegisterForm({onRegister}) {
+            const [input, setInput]         = React.useState("");
+            const [error, setError]         = React.useState("");
+            const [mode, setMode]           = React.useState("login");
+            const [password, setPassword]   = React.useState("");
+
+            async function handleRegister() {
+                setError("");
+
+                const response = await fetch(`${API}/api/users/register`, {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({username: input, password: password})
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    onRegister(data.id, data.username);
+                } else {
+                    setError(data.error);
+                }
+            }
+
+            async function handleLogin() {
+                setError("");
+                const response = await fetch(`${API}/api/login`, {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({username: input, password: password})
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    onRegister(data.id, data.username);
+                } else {
+                    setError(data.error);
+                }
+            }
+
+            return (
+                <div className="register-container">
+                    <div className="register-box">
+                        <h1>Trading Sim</h1>
+                        <p>Trade real stocks with virtual money</p>
+                        <div className="mode-toggle">
+                            <button 
+                                className={`mode-btn ${mode === "login" ? "active" : ""}`}
+                                onClick={() => setMode("login")}
+                            >Login</button>
+                            <button 
+                                className={`mode-btn ${mode === "register" ? "active" : ""}`}
+                                onClick={() => setMode("register")}
+                            >Register</button>
+                        </div>
+                        <input
+                            type="text"
+                            placeholder="Username"
+                            value={input}
+                            onChange={(e) => setInput(e.target.value)}
+                        />
+                        <input
+                            type="password"
+                            placeholder="Password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                        />
+                        <button 
+                            className="btn-primary"
+                            onClick={mode === "login" ? handleLogin : handleRegister}
+                        >
+                            {mode === "login" ? "Login" : "Create Account"}
+                        </button>
+                        {error && <p className="red" style={{marginTop: "10px"}}>{error}</p>}
+                    </div>
+                </div>
+            );
+        }
+
+        function PriceTable({onBuy}) { 
+            const [prices, setPrices] = React.useState([]);
+
+            async function fetchPrices() {
+                const response = await fetch(`${API}/api/prices`);
+                const data = await response.json();
+                setPrices(data)
+            }
+
+            React.useEffect(() => {
+                fetchPrices();
+                const interval = setInterval(fetchPrices, 30000);
+                return () => clearInterval(interval);
+            }, []);
+
+            return (
+                <div className="section">
+                    <h2>Live Prices</h2>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Symbol</th>
+                                <th>Price</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {prices.map(p => (
+                                <tr key={p.symbol}>
+                                    <td>{p.symbol}</td>
+                                    <td>${p.price.toFixed(2)}</td>
+                                    <td>
+                                        <button onClick={() => onBuy(p.symbol)}>
+                                            Buy
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            );
+        }
+
+        function TradeForm({ userId, symbol, onTradeComplete }) {
+            const [side, setSide]       = React.useState("BUY");
+            const [shares, setShares]   = React.useState(1);
+            const [message, setMessage] = React.useState("");
+            const [success, setSuccess] = React.useState(false);
+
+            async function trade() {
+                setMessage("");
+                const response = await fetch(`${API}/api/trade`, {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({
+                        user_id: userId,
+                        symbol: symbol,
+                        side: side,
+                        shares: parseFloat(shares)
+                    })
+                });
+                const data = await response.json();
+                setSuccess(data.success);
+                setMessage(data.message);
+                if (data.success) onTradeComplete();
+            }
+
+            return (
+                <div>
+                    <p style={{marginBottom: "8px", color: "#8b949e", fontSize: "13px"}}>
+                        Trading: <strong style={{color: "#e6edf3"}}>{symbol}</strong>
+                    </p>
+                    <div style={{display: "flex", gap: "4px", marginBottom: "8px"}}>
+                        <button 
+                            className={`btn-buy`}
+                            style={{opacity: side === "BUY" ? 1 : 0.4}}
+                            onClick={() => setSide("BUY")}
+                        >BUY</button>
+                        <button 
+                            className={`btn-sell`}
+                            style={{opacity: side === "SELL" ? 1 : 0.4}}
+                            onClick={() => setSide("SELL")}
+                        >SELL</button>
+                    </div>
+                    <input
+                        type="number"
+                        value={shares}
+                        onChange={(e) => setShares(e.target.value)}
+                        min="1"
+                        placeholder="Shares"
+                    />
+                    <button className={side === "BUY" ? "btn-buy" : "btn-sell"} onClick={trade}>
+                        Execute {side}
+                    </button>
+                    {message && (
+                        <p className={success ? "green" : "red"} style={{marginTop: "8px", fontSize: "13px"}}>
+                            {message}
+                        </p>
+                    )}
+                </div>
+            );
+        }
+
+        function Portfolio({userId, refresh}) {
+            const [portfolio, setPortfolio] = React.useState(null);
+
+            async function fetchPortfolio() {
+                const response = await fetch(`${API}/api/portfolio/${userId}`);
+                const data = await response.json();
+                setPortfolio(data);
+            }
+
+            React.useEffect(() => {
+                fetchPortfolio();
+            }, [refresh]);
+
+            if (!portfolio) return <div className="section">Loading portfolio...</div>;
+
+            return (
+                <div className="section">
+                    <h2>Portfolio</h2>
+                    <p>Cash: ${portfolio.balance.toFixed(2)}</p>
+                    <p>Equity: ${portfolio.equity.toFixed(2)}</p>
+                    <p>Total Value: ${portfolio.total_value.toFixed(2)}</p>
+                    <p>
+                        PnL:{" "}
+                        <span className={portfolio.pnl >= 0 ? "green" : "red"}>
+                            ${portfolio.pnl.toFixed(2)}
+                        </span>
+                    </p>
+                    <h3>Holdings</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Symbol</th>
+                                <th>Shares</th>
+                                <th>Price</th>
+                                <th>Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {portfolio.holdings.map(h => (
+                                <tr key={h.symbol}>
+                                    <td>{h.symbol}</td>
+                                    <td>{h.shares}</td>
+                                    <td>${h.current_price.toFixed(2)}</td>
+                                    <td>${h.value.toFixed(2)}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            );
+        }
+
+        function TradeHistory({ userId, refresh }) {
+            const [history, setHistory] = React.useState([]);
+
+            async function fetchHistory() {
+                const response = await fetch(`${API}/api/history/${userId}`);
+                const data = await response.json();
+                setHistory(data);
+            }
+
+            React.useEffect(() => {
+                fetchHistory();
+            }, [refresh]);
+
+            return (
+                <div className="section">
+                    <h2>Trade History</h2>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Symbol</th>
+                                <th>Side</th>
+                                <th>Shares</th>
+                                <th>Price</th>
+                                <th>Total</th>
+                                <th>Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {history.map(t => (
+                                <tr key={t.id}>
+                                    <td>{t.symbol}</td>
+                                    <td className={t.side === "BUY" ? "green" : "red"}>
+                                        {t.side}
+                                    </td>
+                                    <td>{t.shares}</td>
+                                    <td>${t.price.toFixed(2)}</td>
+                                    <td>${t.total.toFixed(2)}</td>
+                                    <td>{t.executed_at.substring(0, 16)}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            );
+        }
+
+        function Leaderboard({ currentUsername }) {
+            const [board, setBoard] = React.useState([]);
+
+            async function fetchLeaderboard() {
+                const response = await fetch(`${API}/api/leaderboard`);
+                const data = await response.json();
+                setBoard(data);
+            }
+
+            React.useEffect(() => {
+                fetchLeaderboard();
+                const interval = setInterval(fetchLeaderboard, 30000);
+                return () => clearInterval(interval);
+            }, []);
+
+            return (
+                <div className="section">
+                    <h2>Leaderboard</h2>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Rank</th>
+                                <th>Username</th>
+                                <th>Total Value</th>
+                                <th>PnL</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {board.map(entry => (
+                                <tr
+                                    key={entry.username}
+                                    className={entry.username === currentUsername ? "highlight" : ""}
+                                >
+                                    <td>{entry.rank}</td>
+                                    <td>{entry.username}</td>
+                                    <td>${entry.total_value.toFixed(2)}</td>
+                                    <td className={entry.pnl >= 0 ? "green" : "red"}>
+                                        ${entry.pnl.toFixed(2)}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            );
+        }
+
+        function StockDropdown({ prices, selectedSymbol, onSelect }) {
+            return (
+                <div>
+                    <select
+                        value={selectedSymbol}
+                        onChange={(e) => onSelect(e.target.value)}
+                        style={{marginBottom: "12px"}}
+                    >
+                        {prices.map(p => (
+                            <option key={p.symbol} value={p.symbol}>
+                                {p.symbol} — ${p.price.toFixed(2)}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            );
+        }
+
+        function PriceChart({ symbol, apiKey, secretKey }) {
+            const [bars, setBars] = React.useState([]);
+
+            async function fetchBars() {
+                const url = `https://data.alpaca.markets/v2/stocks/bars?symbols=${symbol}&timeframe=1Hour&limit=100&feed=iex`;
+                const response = await fetch(url, {
+                    headers: {
+                        "APCA-API-KEY-ID": apiKey,
+                        "APCA-API-SECRET-KEY": secretKey
+                    }
+                });
+                const data = await response.json();
+                if (data.bars && data.bars[symbol]) {
+                    setBars(data.bars[symbol]);
+                }
+            }
+
+            React.useEffect(() => {
+                if (apiKey && secretKey) fetchBars();
+            }, [symbol, apiKey, secretKey]);
+
+            React.useEffect(() => {
+                if (bars.length === 0) return;
+
+                const chartEl = document.getElementById("price-chart");
+                if (!chartEl) return;
+
+                const chart = LightweightCharts.createChart(chartEl, {
+                    width: chartEl.clientWidth,
+                    height: 350,
+                    layout: {
+                        background: { color: "#161b22" },
+                        textColor: "#e6edf3"
+                    },
+                    grid: {
+                        vertLines: { color: "#21262d" },
+                        horzLines: { color: "#21262d" }
+                    }
+                });
+
+                const candleSeries = chart.addCandlestickSeries({
+                    upColor: "#3fb950",
+                    downColor: "#f85149",
+                    borderVisible: false,
+                    wickUpColor: "#3fb950",
+                    wickDownColor: "#f85149"
+                });
+
+                const chartData = bars.map(bar => ({
+                    time: Math.floor(new Date(bar.t).getTime() / 1000),
+                    open: bar.o,
+                    high: bar.h,
+                    low: bar.l,
+                    close: bar.c
+                }));
+
+                candleSeries.setData(chartData);
+                chart.timeScale().fitContent();
+
+                return () => chart.remove();
+            }, [bars]);
+
+            return (
+                <div>
+                    <div className="chart-header">
+                        <span style={{fontWeight: "bold", fontSize: "18px"}}>{symbol}</span>
+                    </div>
+                    <div id="price-chart" style={{width: "100%", height: "350px"}}></div>
+                </div>
+            );
+        }
+
+        function PortfolioSummary({ userId, refresh }) {
+            const [portfolio, setPortfolio] = React.useState(null);
+
+            async function fetchPortfolio() {
+                const response = await fetch(`${API}/api/portfolio/${userId}`);
+                const data = await response.json();
+                setPortfolio(data);
+            }
+
+            React.useEffect(() => {
+                fetchPortfolio();
+            }, [refresh]);
+
+            if (!portfolio) return <div style={{color: "#8b949e", fontSize: "13px"}}>Loading...</div>;
+
+            return (
+                <div>
+                    <div className="stat-box">
+                        <div className="stat-label">Cash</div>
+                        <div className="stat-value">${portfolio.balance.toFixed(2)}</div>
+                    </div>
+                    <div className="stat-box">
+                        <div className="stat-label">Equity</div>
+                        <div className="stat-value">${portfolio.equity.toFixed(2)}</div>
+                    </div>
+                    <div className="stat-box">
+                        <div className="stat-label">Total Value</div>
+                        <div className="stat-value">${portfolio.total_value.toFixed(2)}</div>
+                    </div>
+                    <div className="stat-box">
+                        <div className="stat-label">PnL</div>
+                        <div className={`stat-value ${portfolio.pnl >= 0 ? "green" : "red"}`}>
+                            ${portfolio.pnl.toFixed(2)}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function App() {
+            const [userId, setUserId]                   = React.useState(null);
+            const [username, setUsername]               = React.useState("");
+            const [tradeSymbol, setTradeSymbol]         = React.useState("AAPL");
+            const [refresh, setRefresh]                 = React.useState(0);
+            const [prices, setPrices]                   = React.useState([]);
+            const [selectedSymbol, setSelectedSymbol]   = React.useState("AAPL");
+            const [alpacaKey, setAlpacaKey]             = React.useState("");
+            const [alpacaSecret, setAlpacaSecret]       = React.useState("");
+
+            React.useEffect(() => {
+                if (!userId) return;
+
+                // fetch config
+                fetch(`${API}/api/config`)
+                    .then(r => r.json())
+                    .then(data => {
+                        setAlpacaKey(data.alpaca_key);
+                        setAlpacaSecret(data.alpaca_secret);
+                    });
+
+                // fetch prices
+                async function loadPrices() {
+                    const r = await fetch(`${API}/api/prices`);
+                    const data = await r.json();
+                    setPrices(data);
+                }
+
+                loadPrices();
+                const interval = setInterval(loadPrices, 30000);
+                return () => clearInterval(interval);
+            }, [userId]);
+
+            function handleRegister(id, name) {
+                setUserId(id);
+                setUsername(name);
+            }
+
+            function handleTradeComplete() {
+                setRefresh(r => r + 1);
+            }
+
+            function handleBuy(symbol) {
+                setTradeSymbol(symbol);
+            }
+
+            if (!userId) {
+                return <RegisterForm onRegister={handleRegister} />;
+            }
+
+            return (
+                <div style={{display: "flex", flexDirection: "column", height: "100vh"}}>
+                    <div className="header">
+                        <h1>Trading Sim</h1>
+                        <span style={{color: "#8b949e"}}>Welcome, <strong style={{color: "#e6edf3"}}>{username}</strong></span>
+                    </div>
+                    <div className="main-layout">
+                        <div className="sidebar">
+                            <p className="section-title">Markets</p>
+                            <StockDropdown
+                                prices={prices}
+                                selectedSymbol={selectedSymbol}
+                                onSelect={setSelectedSymbol}
+                            />
+                            <p className="section-title">Trade</p>
+                            <TradeForm
+                                userId={userId}
+                                symbol={selectedSymbol}
+                                onTradeComplete={handleTradeComplete}
+                            />
+                            <p className="section-title">Account</p>
+                            <PortfolioSummary userId={userId} refresh={refresh} />
+                        </div>
+                        <div className="main-content">
+                            <div className="chart-container">
+                                <PriceChart
+                                    symbol={selectedSymbol}
+                                    apiKey={alpacaKey}
+                                    secretKey={alpacaSecret}
+                                />
+                            </div>
+                            <div className="bottom-panels">
+                                <div className="panel">
+                                    <Portfolio userId={userId} refresh={refresh} />
+                                </div>
+                                <div className="panel">
+                                    <TradeHistory userId={userId} refresh={refresh} />
+                                </div>
+                                <div className="panel">
+                                    <Leaderboard currentUsername={username} />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>

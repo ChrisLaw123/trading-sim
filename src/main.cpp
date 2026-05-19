@@ -45,7 +45,10 @@ int main() {
         price_thread.detach();
 
         crow::SimpleApp app;
-        setup_routes(app, config.db_connection_string(), feed);
+        setup_routes(app, config.db_connection_string(), feed,
+            config.get("ALPACA_API_KEY"),
+            config.get("ALPACA_SECRET_KEY")
+        );
 
         std::cout << "Starting up\n";
 

@@ -10,6 +10,7 @@
 #include "engine/TradeEngine.h"
 #include "feed/PriceFeed.h"
 #include "api/Validator.h"
+#include <fstream>
 
 inline crow::response make_response(int status, const std::string& body) {
     crow::response res(status, body);
@@ -17,21 +18,43 @@ inline crow::response make_response(int status, const std::string& body) {
     return res;
 }
 
-inline void setup_routes(crow::SimpleApp& app, const std::string& conn_string, PriceFeed& feed) {
+inline void setup_routes(crow::SimpleApp& app, const std::string& conn_string, PriceFeed& feed, const std::string& alpaca_key, const std::string& alpaca_secret) {
+
+    CROW_ROUTE(app, "/api/config")
+    ([alpaca_key, alpaca_secret]() {
+        nlohmann::json res;
+        res["alpaca_key"]    = alpaca_key;
+        res["alpaca_secret"] = alpaca_secret;
+        return make_response(200, res.dump());
+    });
+
+    CROW_ROUTE(app, "/")
+    ([](const crow::request& req) {
+        std::ifstream file("frontend/index.html");
+        std::string content(
+            (std::istreambuf_iterator<char>(file)),
+            std::istreambuf_iterator<char>()
+        );
+        crow::response res(200, content);
+        res.add_header("Content-Type", "text/html");
+        res.add_header("Access-Control-Allow-Origin", "*");
+        return res;
+    });
 
     CROW_ROUTE(app, "/api/users/register").methods("POST"_method)
     ([conn_string](const crow::request& req) {
         Database db(conn_string);
         UserRepository users(db);
         auto body = nlohmann::json::parse(req.body, nullptr, false);
+        std::string password = body.value("password","");
         if (body.is_discarded()) {
             return make_response(400, R"({"error":"Invalid JSON"})");
         }
 
         std::string username = body.value("username", "");
 
-        if (username.empty()) {
-            return make_response(400, R"({"error":"Username required"})");
+        if (username.empty() || password.empty()) {
+            return make_response(400, R"({"error":"Username and password required"})");
         }
 
         if (!Validator::is_valid_username(username)) {
@@ -39,7 +62,7 @@ inline void setup_routes(crow::SimpleApp& app, const std::string& conn_string, P
         }
 
         try {
-            User user = users.create(username);
+            User user = users.create(username, password);
 
             nlohmann::json res;
             res["id"]       = user.id;
@@ -253,6 +276,44 @@ inline void setup_routes(crow::SimpleApp& app, const std::string& conn_string, P
 
         } catch (const std::exception& e) {
             std::cerr << "Leaderboard error: " << e.what() << "\n";
+            return make_response(500, R"({"error":"Internal server error"})");
+        }
+    });
+
+    CROW_ROUTE(app, "/api/login").methods("POST"_method)
+    ([conn_string](const crow::request& req) {
+        try {
+            auto body = nlohmann::json::parse(req.body, nullptr, false);
+            if (body.is_discarded()) {
+                return make_response(400, R"({"error":"Invalid JSON"})");
+            }
+
+            std::string username = body.value("username", "");
+            std::string password = body.value("password", "");
+
+            if (username.empty() || password.empty()) {
+                return make_response(400, R"({"error":"Username and password required"})");
+            }
+
+            Database db(conn_string);
+            UserRepository users(db);
+
+            if (!users.verify_password(username, password)) {
+                return make_response(401, R"({"error":"Invalid credentials"})");
+            }
+
+            auto user_opt = users.find_by_username(username);
+            if (!user_opt) {
+                return make_response(404, R"({"error":"User not found"})");
+            }
+
+            nlohmann::json res;
+            res["id"]       = user_opt->id;
+            res["username"] = user_opt->username;
+            return make_response(200, res.dump());
+
+        } catch (const std::exception& e) {
+            std::cerr << "Login error: " << e.what() << "\n";
             return make_response(500, R"({"error":"Internal server error"})");
         }
     });
