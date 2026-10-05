@@ -2,3 +2,6 @@ build/
 .env
 *.o
 *.a
+.vscode/
+CMakeUserPresets.json
+.pgdata/

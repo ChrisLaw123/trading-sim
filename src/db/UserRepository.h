@@ -2,158 +2,77 @@
 
 #include <pqxx/pqxx>
 #include <string>
-#include <vector>
 #include <optional>
 #include <stdexcept>
-#include <tuple>
+#include <iostream>
 #include "db/Database.h"
 #include "models/User.h"
-#include <functional>
 
-inline std::string hash_password(const std::string& password) {
-    std::hash<std::string> hasher;
-    return std::to_string(hasher(password));
-}
-
+// Single-player: there is exactly one account, created on first use.
+//
+// The users table is kept as-is rather than flattened away, so holdings and trades
+// keep their foreign key and adding multiple players (and a leaderboard) later is a
+// pure addition rather than a migration that has to backfill user_id.
 class UserRepository {
 public:
+    // The sentinel name for the one account. Nothing displays it; it exists because
+    // username is NOT NULL UNIQUE and gives us a stable key to upsert against.
+    static constexpr const char* ACCOUNT_NAME = "player";
+
     explicit UserRepository(Database& db) : db_(db) {}
 
-    User create(const std::string& username, const std::string& password) {
-
-    pqxx::work txn(db_.conn());
-
-    try {
+    // Fetches the account, creating it with the opening balance on first call.
+    //
+    // ON CONFLICT DO UPDATE performs a write, so this takes a row lock that is held
+    // for the rest of the transaction. That is what serialises concurrent trades:
+    // a second trade blocks here until the first commits, and then reads the balance
+    // the first one left behind rather than a stale copy.
+    User get_or_create(pqxx::work& txn, double starting_balance) {
         auto result = txn.exec_params(
-            "INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id, username, balance::float8, created_at::text",
-            username, hash_password(password)
+            "INSERT INTO users (username, balance) VALUES ($1, $2::numeric) "
+            "ON CONFLICT (username) DO UPDATE SET username = EXCLUDED.username "
+            "RETURNING id, username, balance::float8, created_at::text",
+            ACCOUNT_NAME, starting_balance
         );
 
-        User user;
-        user.id             = result[0][0].as<std::string>();
-        user.username       = result[0][1].as<std::string>();
-        user.balance        = result[0][2].as<double>();
-        user.created_at     = result[0][3].as<std::string>();
-        user.password_hash  = "";
-
-        txn.commit();
-
-        return user;
-    } catch (const pqxx::unique_violation&) {
-        throw std::runtime_error("Username already taken");
+        return read_user(result[0]);
     }
-}
 
-    std::optional<User> find_by_id(const std::string& id) {
+    User get_or_create(double starting_balance) {
         pqxx::work txn(db_.conn());
+        User user = get_or_create(txn, starting_balance);
+        txn.commit();
+        return user;
+    }
 
+    // Relative, guarded, and atomic. Postgres does the arithmetic on the NUMERIC
+    // column, and the WHERE clause makes "can they afford it" part of the write
+    // rather than a separate read that another request could race.
+    // Returns the new balance, or nullopt when the guard rejected the change.
+    std::optional<double> apply_cash_delta(pqxx::work& txn, const std::string& user_id, double delta) {
         auto result = txn.exec_params(
-            "SELECT id, username, balance::float8, created_at::text FROM users WHERE id = $1",
-            id
+            "UPDATE users SET balance = balance + $1::numeric "
+            "WHERE id = $2 AND balance + $1::numeric >= 0 "
+            "RETURNING balance::float8",
+            delta, user_id
         );
-
-        txn.commit(); 
 
         if (result.empty()) {
             return std::nullopt;
         }
 
-        User user;
-        user.id             = result[0][0].as<std::string>();
-        user.username       = result[0][1].as<std::string>();
-        user.balance        = result[0][2].as<double>();
-        user.created_at     = result[0][3].as<std::string>();
-        user.password_hash  = "";
-
-        return user;
+        return result[0][0].as<double>();
     }
 
-    std::optional<User> find_by_username(const std::string& username) {
-        pqxx::work txn(db_.conn());
-
-        auto result = txn.exec_params(
-            "SELECT id, username, balance::float8, created_at::text FROM users WHERE username= $1",
-            username
-        );
-
-        txn.commit();
-
-        if (result.empty()) {
-            return std::nullopt;
-        }
-
-        User user;
-        user.id             = result[0][0].as<std::string>();
-        user.username       = result[0][1].as<std::string>();
-        user.balance        = result[0][2].as<double>();
-        user.created_at     = result[0][3].as<std::string>();
-        user.password_hash  = "";
-
-        return user;
-    }
-
-    void update_cash(const std::string& user_id, double new_balance) {
-        pqxx::work txn(db_.conn());
-
-        txn.exec_params(
-            "UPDATE users SET balance = $1 WHERE id = $2",
-            new_balance, user_id
-        );
-
-        txn.commit();
-    }
-
-    std::vector<std::tuple<std::string, double, double>> leaderboard() {
-        
-        try {
-            pqxx::work txn(db_.conn());
-
-            auto result = txn.exec_params(
-                "SELECT u.username, u.balance::float8, "
-                "COALESCE(SUM(h.shares * p.price), 0)::float8 AS equity "
-                "FROM users u "
-                "LEFT JOIN holdings h ON h.user_id = u.id "
-                "LEFT JOIN prices p ON p.symbol = h.symbol "
-                "GROUP BY u.id, u.username, u.balance "
-                "ORDER BY (u.balance + COALESCE(SUM(h.shares * p.price), 0)) DESC "
-            );
-
-            txn.commit();
-
-            std::vector<std::tuple<std::string, double, double>> board;
-
-            for (auto row : result) {
-                board.push_back(std::make_tuple(
-                    row[0].as<std::string>(),   //username
-                    row[1].as<double>(),        //cash balance
-                    row[2].as<double>()         //equity
-                ));
-            }
-
-            return board;
-        } catch (const std::exception& e) {
-            std::cerr << "Leaderboard query error: " << e.what() << "\n";
-            return {};
-        }
-    }
-
-    bool verify_password(std::string& username, std::string& password) {
-        pqxx::work txn(db_.conn());
-
-        auto result = txn.exec_params(
-            "SELECT password_hash FROM users WHERE username = $1",
-            username
-        );
-
-        txn.commit();
-
-        if (result.empty()) return false;
-        if (result[0][0].is_null()) return false;
-
-        std::string stored_hash = result[0][0].as<std::string>();
-        return stored_hash == hash_password(password);
-    }
-    
 private:
+    static User read_user(const pqxx::row& row) {
+        User user;
+        user.id         = row[0].as<std::string>();
+        user.username   = row[1].as<std::string>();
+        user.balance    = row[2].as<double>();
+        user.created_at = row[3].as<std::string>();
+        return user;
+    }
+
     Database& db_;
 };

@@ -12,17 +12,13 @@ class TradeRepository {
 public:
     explicit TradeRepository(Database& db) : db_(db) {}
 
-    void create(const std::string& user_id, const std::string& symbol, const std::string& side, double shares, double price, double total) {
-        pqxx::work txn(db_.conn());
-
+    void create(pqxx::work& txn, const std::string& user_id, const std::string& symbol,
+                const std::string& side, double shares, double price, double total) {
         txn.exec_params(
             "INSERT INTO trades (user_id, symbol, side, shares, price, total) "
-            "VALUES ($1, $2, $3, $4, $5, $6)",
+            "VALUES ($1, $2, $3, $4::numeric, $5::numeric, $6::numeric)",
             user_id, symbol, side, shares, price, total
         );
-
-        txn.commit();
-
     }
 
     std::vector<Trade> get_by_user(const std::string& user_id, int limit = 50) {
@@ -43,14 +39,14 @@ public:
 
         for (auto row : result) {
             Trade t;
-            t.id            = row[0].as<std::string>();
-            t.user_id       = row[1].as<std::string>();
-            t.symbol        = row[2].as<std::string>();
-            t.side          = row[3].as<std::string>();
-            t.shares        = row[4].as<double>();
-            t.price         = row[5].as<double>();
-            t.total         = row[6].as<double>();
-            t.executed_at   = row[7].as<std::string>();
+            t.id          = row[0].as<std::string>();
+            t.user_id     = row[1].as<std::string>();
+            t.symbol      = row[2].as<std::string>();
+            t.side        = row[3].as<std::string>();
+            t.shares      = row[4].as<double>();
+            t.price       = row[5].as<double>();
+            t.total       = row[6].as<double>();
+            t.executed_at = row[7].as<std::string>();
 
             trades.push_back(t);
         }

@@ -5,221 +5,430 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Trading Sim</title>
 
-    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://unpkg.com/lightweight-charts@3.8.0/dist/lightweight-charts.standalone.production.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"
+            integrity="sha384-DGyLxAyjq0f9SPpVevD6IgztCFlnMF6oW/XQGmfe+IsZ8TqEiDrcHkMLKI6fiB/Z"
+            crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"
+            integrity="sha384-gTGxhz21lVGYNMcdJOyq01Edg0jhn/c22nsx0kyqP0TxaV5WVdsSH1fSDUf5YJj1"
+            crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/@babel/standalone@7.26.4/babel.min.js"
+            integrity="sha384-x/ilTFv/u/eu6YSmkFDZl5V5Mm/pkxxcVv2cVJOrr1J0rvILhMvRBCy6yA75wYBj"
+            crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/lightweight-charts@3.8.0/dist/lightweight-charts.standalone.production.js"
+            integrity="sha384-7/4mCPzNngsbDuJa6jilz7GgN9gBRDCcCq94wXAcJerUsOopCxf8NS/MS8530Xmu"
+            crossorigin="anonymous"></script>
 
     <style>
+        :root {
+            /* Deep petrol rather than neutral black: the surface has a cool cast so
+               the only saturated things on screen are price movements. */
+            --bg:        #071012;
+            --panel:     #0c181a;
+            --raised:    #112124;
+            --line:      #192e32;
+            --line-soft: #122326;
+
+            --ink:       #dde8e9;
+            --ink-dim:   #6f8a8e;
+            --ink-faint: #47605f;
+
+            --up:        #2fcf8f;
+            --down:      #f2555a;
+            /* Selection only. Never used for value, so it can never be misread
+               as a gain or a loss. */
+            --select:    #e8b34a;
+            /* Connection state. Its own hue on purpose: jade and coral mean
+               gain and loss here, so a green dot would read as a price move. */
+            --live:      #3bb3c3;
+
+            --mono: 'IBM Plex Mono', ui-monospace, monospace;
+            --sans: 'IBM Plex Sans', system-ui, sans-serif;
+
+            --row: 22px;
+        }
+
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
+        html, body { height: 100%; }
+
         body {
-            font-family: 'Segoe UI', sans-serif;
-            background: #0d1117;
-            color: #e6edf3;
-            height: 100vh;
+            background: var(--bg);
+            color: var(--ink);
+            font-family: var(--sans);
+            font-size: 12px;
+            line-height: 1.35;
             overflow: hidden;
+            -webkit-font-smoothing: antialiased;
         }
 
-        #root { height: 100vh; display: flex; flex-direction: column; }
+        /* Every figure on the page is tabular, so decimals stack down a column. */
+        .num {
+            font-family: var(--mono);
+            font-variant-numeric: tabular-nums;
+            font-feature-settings: "tnum" 1;
+            text-align: right;
+            white-space: nowrap;
+        }
 
-        .header {
-            background: #161b22;
-            padding: 12px 24px;
+        .tick {
+            font-family: var(--mono);
+            font-weight: 600;
+            letter-spacing: 0.02em;
+        }
+
+        .up { color: var(--up); }
+        .down { color: var(--down); }
+        .dim { color: var(--ink-dim); }
+
+        #root { height: 100%; }
+
+        .terminal {
+            height: 100%;
+            display: grid;
+            grid-template-rows: 40px minmax(0, 1fr) 24px;
+        }
+
+        /* ---- top bar ---- */
+
+        .topbar {
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            border-bottom: 1px solid #30363d;
-        }
-
-        .header h1 { font-size: 20px; color: #58a6ff; }
-
-        .main-layout {
-            display: flex;
-            flex: 1;
-            overflow: hidden;
-        }
-
-        .sidebar {
-            width: 280px;
-            background: #161b22;
-            border-right: 1px solid #30363d;
-            display: flex;
-            flex-direction: column;
-            overflow-y: auto;
-            padding: 16px;
-        }
-
-        .main-content {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-
-        .chart-container {
-            height: 400px;
-            background: #161b22;
-            border-bottom: 1px solid #30363d;
-            padding: 16px;
-        }
-
-        .chart-header {
-            display: flex;
             justify-content: space-between;
-            margin-bottom: 12px;
+            padding: 0 14px;
+            border-bottom: 1px solid var(--line);
+            background: var(--panel);
         }
 
-        .bottom-panels {
-            flex: 1;
-            display: flex;
-            overflow: hidden;
-        }
-
-        .panel {
-            flex: 1;
-            overflow-y: auto;
-            padding: 16px;
-            border-right: 1px solid #30363d;
-        }
-
-        .panel:last-child { border-right: none; }
-
-        .stock-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 10px 8px;
-            border-radius: 6px;
-            cursor: pointer;
-            margin-bottom: 4px;
-        }
-
-        .stock-item:hover { background: #21262d; }
-        .stock-item.active { background: #1f3a5c; }
-
-        .stock-symbol { font-weight: bold; font-size: 14px; }
-        .stock-price { color: #58a6ff; font-size: 14px; }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
+        .brand {
+            font-weight: 600;
             font-size: 13px;
+            letter-spacing: 0.01em;
         }
 
-        th, td {
-            padding: 8px 10px;
-            text-align: left;
-            border-bottom: 1px solid #21262d;
+        /* The one loud thing on the page. Everything else stays quiet. */
+        .headline { display: flex; align-items: baseline; gap: 14px; }
+        .headline-label { color: var(--ink-dim); font-size: 11px; }
+        .headline-value {
+            font-family: var(--mono);
+            font-variant-numeric: tabular-nums;
+            font-size: 21px;
+            font-weight: 500;
+            letter-spacing: -0.01em;
+        }
+        .headline-pnl {
+            font-family: var(--mono);
+            font-variant-numeric: tabular-nums;
+            font-size: 13px;
+            font-weight: 500;
         }
 
-        th { color: #8b949e; font-weight: normal; }
+        /* ---- three column desk ---- */
 
-        input, select {
-            width: 100%;
-            padding: 8px 12px;
-            margin: 6px 0;
-            background: #0d1117;
-            color: #e6edf3;
-            border: 1px solid #30363d;
-            border-radius: 6px;
-            font-size: 14px;
+        .desk {
+            display: grid;
+            grid-template-columns: 184px minmax(0, 1fr) 358px;
+            min-height: 0;
         }
 
-        button {
-            width: 100%;
+        .col {
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            min-width: 0;
+        }
+
+        .col + .col { border-left: 1px solid var(--line); }
+
+        .pane {
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        .pane + .pane { border-top: 1px solid var(--line); }
+
+        .pane-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            height: 24px;
+            padding: 0 10px;
+            flex: 0 0 auto;
+            color: var(--ink-dim);
+            font-size: 11px;
+            font-weight: 500;
+            background: var(--panel);
+            border-bottom: 1px solid var(--line-soft);
+        }
+
+        .pane-body { overflow-y: auto; min-height: 0; flex: 1 1 auto; }
+
+        .pane-note {
             padding: 10px;
-            margin: 4px 0;
-            border: none;
-            border-radius: 6px;
+            color: var(--ink-faint);
+            font-size: 11px;
+            line-height: 1.5;
+        }
+
+        /* ---- watchlist ---- */
+
+        .quote {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            align-items: center;
+            gap: 6px;
+            height: var(--row);
+            padding: 0 10px 0 7px;
+            border-left: 3px solid transparent;
             cursor: pointer;
-            font-size: 14px;
-            font-weight: bold;
+            font-size: 12px;
         }
 
-        .btn-buy { background: #238636; color: white; }
-        .btn-buy:hover { background: #2ea043; }
-        .btn-sell { background: #da3633; color: white; }
-        .btn-sell:hover { background: #f85149; }
-        .btn-primary { background: #1f6feb; color: white; }
-        .btn-primary:hover { background: #388bfd; }
-        .btn-secondary { background: #21262d; color: #e6edf3; }
-        .btn-secondary:hover { background: #30363d; }
-        .btn-active { border-bottom: 2px solid #58a6ff; }
+        .quote:hover { background: var(--raised); }
 
-        .green { color: #3fb950; }
-        .red { color: #f85149; }
-
-        .stat-box {
-            background: #0d1117;
-            border: 1px solid #30363d;
-            border-radius: 6px;
-            padding: 12px;
-            margin-bottom: 8px;
+        .quote[aria-selected="true"] {
+            background: var(--raised);
+            border-left-color: var(--select);
         }
 
-        .stat-label { font-size: 11px; color: #8b949e; margin-bottom: 4px; }
-        .stat-value { font-size: 18px; font-weight: bold; }
+        .quote-price { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 
-        .section-title {
-            font-size: 13px;
-            color: #8b949e;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin: 16px 0 8px;
+        /* The single piece of motion: a changed price flashes once, so you can see
+           what moved without diffing the column yourself. */
+        @keyframes flash-up   { from { background: rgba(47, 207, 143, 0.26); } }
+        @keyframes flash-down { from { background: rgba(242, 85, 90, 0.26); } }
+        .flash-up   { animation: flash-up 900ms ease-out; }
+        .flash-down { animation: flash-down 900ms ease-out; }
+
+        @media (prefers-reduced-motion: reduce) {
+            .flash-up, .flash-down { animation: none; }
         }
 
-        .highlight { background: #1f3a5c; }
+        /* ---- chart ---- */
 
-        .register-container {
+        .chart-pane { flex: 1 1 auto; min-height: 0; }
+
+        .chart-head {
             display: flex;
+            align-items: baseline;
+            gap: 12px;
+            height: 30px;
+            padding: 0 12px;
+            flex: 0 0 auto;
+            border-bottom: 1px solid var(--line-soft);
+            background: var(--panel);
+        }
+
+        .chart-symbol { font-family: var(--mono); font-weight: 600; font-size: 14px; }
+        .chart-last {
+            font-family: var(--mono);
+            font-variant-numeric: tabular-nums;
+            font-size: 14px;
+        }
+        .chart-meta { margin-left: auto; color: var(--ink-faint); font-size: 11px; }
+
+        .chart-canvas { flex: 1 1 auto; min-height: 0; }
+
+        /* Without this the chart area is just a large void whenever the feed is
+           unreachable, which is the first thing you see on a fresh checkout. */
+        .chart-empty {
+            flex: 1 1 auto;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
             justify-content: center;
-            align-items: center;
-            height: 100vh;
-            background: #0d1117;
-        }
-
-        .register-box {
-            background: #161b22;
-            border: 1px solid #30363d;
-            border-radius: 12px;
-            padding: 40px;
-            width: 360px;
-        }
-
-        .register-box h1 {
+            gap: 7px;
+            padding: 20px;
             text-align: center;
-            color: #58a6ff;
-            margin-bottom: 8px;
         }
 
-        .register-box p {
-            text-align: center;
-            color: #8b949e;
-            margin-bottom: 24px;
-            font-size: 14px;
+        .chart-empty-head { color: var(--ink-dim); font-size: 13px; }
+        .chart-empty-hint {
+            color: var(--ink-faint);
+            font-size: 11px;
+            max-width: 42ch;
+            line-height: 1.6;
+        }
+        .chart-empty-hint code {
+            font-family: var(--mono);
+            color: var(--ink-dim);
         }
 
-        .mode-toggle {
+        /* ---- order ticket ---- */
+
+        .ticket {
+            flex: 0 0 auto;
             display: flex;
-            margin-bottom: 20px;
-            border-bottom: 1px solid #30363d;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            border-top: 1px solid var(--line);
+            background: var(--panel);
+            flex-wrap: wrap;
         }
 
-        .mode-btn {
-            flex: 1;
-            background: none;
-            color: #8b949e;
-            border: none;
-            border-bottom: 2px solid transparent;
-            border-radius: 0;
-            padding: 10px;
+        .ticket-label { color: var(--ink-dim); font-size: 11px; }
+
+        .side-toggle { display: flex; }
+
+        .side-btn {
+            font-family: var(--sans);
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.03em;
+            color: var(--ink-dim);
+            background: var(--raised);
+            border: 1px solid var(--line);
+            padding: 5px 13px;
             cursor: pointer;
-            font-size: 14px;
+        }
+        .side-btn:first-child { border-right: none; }
+
+        .side-btn[aria-pressed="true"] {
+            color: var(--bg);
+            border-color: transparent;
+        }
+        .side-btn.buy[aria-pressed="true"]  { background: var(--up); }
+        .side-btn.sell[aria-pressed="true"] { background: var(--down); }
+
+        .qty-input {
+            width: 86px;
+            padding: 5px 8px;
+            background: var(--bg);
+            color: var(--ink);
+            border: 1px solid var(--line);
+            font-family: var(--mono);
+            font-variant-numeric: tabular-nums;
+            font-size: 12px;
+            text-align: right;
         }
 
-        .mode-btn.active {
-            color: #e6edf3;
-            border-bottom-color: #58a6ff;
+        .estimate { color: var(--ink-dim); font-size: 11px; }
+        .estimate .num { color: var(--ink); font-size: 12px; margin-left: 5px; }
+
+        .execute {
+            font-family: var(--sans);
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.03em;
+            padding: 6px 16px;
+            border: 1px solid transparent;
+            cursor: pointer;
+            color: var(--bg);
+        }
+        .execute.buy  { background: var(--up); }
+        .execute.sell { background: var(--down); }
+        .execute:disabled { opacity: 0.45; cursor: default; }
+
+        .ticket-msg { font-size: 11px; margin-left: auto; }
+
+        /* ---- data tables ---- */
+
+        table { width: 100%; border-collapse: collapse; }
+
+        thead th {
+            position: sticky;
+            top: 0;
+            height: 20px;
+            padding: 0 7px;
+            background: var(--panel);
+            color: var(--ink-faint);
+            font-size: 10px;
+            font-weight: 500;
+            text-align: left;
+            border-bottom: 1px solid var(--line-soft);
+        }
+
+        thead th.r { text-align: right; }
+
+        tbody td {
+            height: var(--row);
+            padding: 0 7px;
+            border-bottom: 1px solid var(--line-soft);
+            font-size: 12px;
+        }
+
+        tbody tr:hover td { background: var(--raised); }
+
+        /* ---- status strip ---- */
+
+        .statusbar {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            padding: 0 12px;
+            background: var(--panel);
+            border-top: 1px solid var(--line);
+            color: var(--ink-dim);
+            font-size: 11px;
+        }
+
+        .stat-pair { display: flex; align-items: baseline; gap: 6px; }
+        .stat-pair .num { color: var(--ink); font-size: 11px; }
+        .statusbar .spacer { margin-left: auto; }
+
+        /* Market state belongs in the top bar, where you look to ask whether
+           the thing is live. */
+        .market {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            margin-left: 16px;
+            font-size: 11px;
+            color: var(--ink-dim);
+        }
+
+        .market-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            flex: 0 0 auto;
+            background: var(--ink-faint);
+        }
+
+        .market.is-open { color: var(--ink); }
+
+        .market.is-open .market-dot {
+            background: var(--live);
+            box-shadow: 0 0 0 3px rgba(59, 179, 195, 0.16);
+        }
+
+        .topbar-left { display: flex; align-items: baseline; }
+
+        .alert {
+            padding: 6px 10px;
+            margin: 8px 10px;
+            border-left: 2px solid var(--down);
+            background: rgba(242, 85, 90, 0.08);
+            color: #ffb4b4;
+            font-size: 11px;
+        }
+
+        :focus-visible {
+            outline: 2px solid var(--select);
+            outline-offset: -2px;
+        }
+
+        ::-webkit-scrollbar { width: 9px; height: 9px; }
+        ::-webkit-scrollbar-track { background: var(--bg); }
+        ::-webkit-scrollbar-thumb { background: var(--line); }
+        ::-webkit-scrollbar-thumb:hover { background: #24444a; }
+
+        /* Density is a desktop affordance. On a narrow screen let it stack and scroll. */
+        @media (max-width: 900px) {
+            body { overflow: auto; }
+            .terminal { height: auto; display: block; }
+            .desk { display: block; }
+            .col + .col { border-left: none; border-top: 1px solid var(--line); }
+            .chart-canvas { height: 240px; }
+            .ticket-msg { margin-left: 0; width: 100%; }
         }
     </style>
 </head>
@@ -227,558 +436,522 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const API = "http://172.19.34.194:8080";
+        // Same origin: this page is served by the C++ server itself, so there is
+        // no host to hardcode and nothing to keep in sync when the machine changes.
+        const API = "";
 
-        function RegisterForm({onRegister}) {
-            const [input, setInput]         = React.useState("");
-            const [error, setError]         = React.useState("");
-            const [mode, setMode]           = React.useState("login");
-            const [password, setPassword]   = React.useState("");
+        // One account, so no identity to pick, store or send. Clear anything a
+        // previous multi-player build of this page left behind.
+        localStorage.removeItem("ts_user_id");
+        localStorage.removeItem("ts_username");
+        localStorage.removeItem("ts_token");
 
-            async function handleRegister() {
-                setError("");
+        // One place that checks the status and turns a failure into a thrown Error
+        // carrying the server's own message. Callers that skip this are how a 500
+        // used to reach render() as undefined and blank the page.
+        async function api(path, options) {
+            const opts = options || {};
+            const headers = Object.assign({}, opts.headers);
 
-                const response = await fetch(`${API}/api/users/register`, {
-                    method: "POST",
-                    headers: {"Content-Type": "application/json"},
-                    body: JSON.stringify({username: input, password: password})
-                });
+            if (opts.body) headers["Content-Type"] = "application/json";
 
-                const data = await response.json();
-
-                if (response.ok) {
-                    onRegister(data.id, data.username);
-                } else {
-                    setError(data.error);
-                }
+            let response;
+            try {
+                response = await fetch(`${API}${path}`, Object.assign({}, opts, {headers: headers}));
+            } catch (networkError) {
+                throw new Error("Cannot reach the server");
             }
 
-            async function handleLogin() {
-                setError("");
-                const response = await fetch(`${API}/api/login`, {
-                    method: "POST",
-                    headers: {"Content-Type": "application/json"},
-                    body: JSON.stringify({username: input, password: password})
-                });
-                const data = await response.json();
-                if (response.ok) {
-                    onRegister(data.id, data.username);
-                } else {
-                    setError(data.error);
-                }
+            const text = await response.text();
+            let data = null;
+            if (text) {
+                try { data = JSON.parse(text); } catch (parseError) { data = null; }
             }
 
-            return (
-                <div className="register-container">
-                    <div className="register-box">
-                        <h1>Trading Sim</h1>
-                        <p>Trade real stocks with virtual money</p>
-                        <div className="mode-toggle">
-                            <button 
-                                className={`mode-btn ${mode === "login" ? "active" : ""}`}
-                                onClick={() => setMode("login")}
-                            >Login</button>
-                            <button 
-                                className={`mode-btn ${mode === "register" ? "active" : ""}`}
-                                onClick={() => setMode("register")}
-                            >Register</button>
-                        </div>
-                        <input
-                            type="text"
-                            placeholder="Username"
-                            value={input}
-                            onChange={(e) => setInput(e.target.value)}
-                        />
-                        <input
-                            type="password"
-                            placeholder="Password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                        />
-                        <button 
-                            className="btn-primary"
-                            onClick={mode === "login" ? handleLogin : handleRegister}
-                        >
-                            {mode === "login" ? "Login" : "Create Account"}
-                        </button>
-                        {error && <p className="red" style={{marginTop: "10px"}}>{error}</p>}
-                    </div>
-                </div>
-            );
+            if (!response.ok) {
+                const message = (data && (data.error || data.message)) ||
+                                `Request failed (${response.status})`;
+                const error = new Error(message);
+                error.status = response.status;
+                error.data = data;
+                throw error;
+            }
+
+            return data;
         }
 
-        function PriceTable({onBuy}) { 
-            const [prices, setPrices] = React.useState([]);
-
-            async function fetchPrices() {
-                const response = await fetch(`${API}/api/prices`);
-                const data = await response.json();
-                setPrices(data)
-            }
+        // Keeps the last good payload on screen when a refresh fails, so a single
+        // blip does not wipe the panel.
+        function useApi(path, deps, intervalMs) {
+            const [state, setState] = React.useState({data: null, error: "", loading: true});
 
             React.useEffect(() => {
-                fetchPrices();
-                const interval = setInterval(fetchPrices, 30000);
-                return () => clearInterval(interval);
-            }, []);
+                let cancelled = false;
+
+                async function load() {
+                    try {
+                        const data = await api(path);
+                        if (!cancelled) setState({data: data, error: "", loading: false});
+                    } catch (e) {
+                        if (!cancelled) setState(prev => ({data: prev.data, error: e.message, loading: false}));
+                    }
+                }
+
+                load();
+
+                if (!intervalMs) return () => { cancelled = true; };
+
+                const id = setInterval(load, intervalMs);
+                return () => { cancelled = true; clearInterval(id); };
+            }, deps);
+
+            return state;
+        }
+
+        const dec2 = new Intl.NumberFormat("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        const dec3 = new Intl.NumberFormat("en-US", {minimumFractionDigits: 3, maximumFractionDigits: 3});
+
+        function isNum(v) { return typeof v === "number" && isFinite(v); }
+
+        // Currency symbols are dropped inside tables; the column header carries the
+        // unit, and the digits stay aligned.
+        function amount(v) { return isNum(v) ? dec2.format(v) : "—"; }
+        function qty(v)    { return isNum(v) ? dec3.format(v) : "—"; }
+        function signed(v) { return isNum(v) ? (v < 0 ? "-" : "+") + dec2.format(Math.abs(v)) : "—"; }
+        function pnlClass(v) { return (!isNum(v) || v === 0) ? "dim" : (v < 0 ? "down" : "up"); }
+
+        function asArray(value) { return Array.isArray(value) ? value : []; }
+
+        function clock(ts) {
+            const s = String(ts || "");
+            return s.length >= 16 ? s.slice(11, 16) : "—";
+        }
+
+        // Alpaca sends ISO 8601 with an offset; render it in the viewer's zone.
+        function whenLabel(iso) {
+            const when = new Date(iso);
+            if (isNaN(when.getTime())) return "";
+
+            const time = when.toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"});
+            const sameDay = when.toDateString() === new Date().toDateString();
+
+            return sameDay ? time : `${when.toLocaleDateString([], {weekday: "short"})} ${time}`;
+        }
+
+        // Without this, a closed market and a broken feed look identical.
+        function MarketStatus({market}) {
+            if (!market || !market.known) return null;
+
+            const open = market.is_open;
+            const when = whenLabel(open ? market.next_close : market.next_open);
 
             return (
-                <div className="section">
-                    <h2>Live Prices</h2>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Symbol</th>
-                                <th>Price</th>
-                                <th>Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {prices.map(p => (
-                                <tr key={p.symbol}>
-                                    <td>{p.symbol}</td>
-                                    <td>${p.price.toFixed(2)}</td>
-                                    <td>
-                                        <button onClick={() => onBuy(p.symbol)}>
-                                            Buy
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                <div className={`market ${open ? "is-open" : ""}`}>
+                    <span className="market-dot"></span>
+                    <span>
+                        {open ? "Market open" : "Market closed"}
+                        {when && (open ? ` · closes ${when}` : ` · opens ${when}`)}
+                    </span>
                 </div>
             );
         }
 
-        function TradeForm({ userId, symbol, onTradeComplete }) {
-            const [side, setSide]       = React.useState("BUY");
-            const [shares, setShares]   = React.useState(1);
-            const [message, setMessage] = React.useState("");
-            const [success, setSuccess] = React.useState(false);
+        function Alert({message}) {
+            if (!message) return null;
+            return <div className="alert">{message}</div>;
+        }
 
-            async function trade() {
-                setMessage("");
-                const response = await fetch(`${API}/api/trade`, {
-                    method: "POST",
-                    headers: {"Content-Type": "application/json"},
-                    body: JSON.stringify({
-                        user_id: userId,
-                        symbol: symbol,
-                        side: side,
-                        shares: parseFloat(shares)
-                    })
-                });
-                const data = await response.json();
-                setSuccess(data.success);
-                setMessage(data.message);
-                if (data.success) onTradeComplete();
-            }
+        function Watchlist({prices, selected, onSelect, flashes}) {
+            const rows = asArray(prices);
 
             return (
-                <div>
-                    <p style={{marginBottom: "8px", color: "#8b949e", fontSize: "13px"}}>
-                        Trading: <strong style={{color: "#e6edf3"}}>{symbol}</strong>
-                    </p>
-                    <div style={{display: "flex", gap: "4px", marginBottom: "8px"}}>
-                        <button 
-                            className={`btn-buy`}
-                            style={{opacity: side === "BUY" ? 1 : 0.4}}
-                            onClick={() => setSide("BUY")}
-                        >BUY</button>
-                        <button 
-                            className={`btn-sell`}
-                            style={{opacity: side === "SELL" ? 1 : 0.4}}
-                            onClick={() => setSide("SELL")}
-                        >SELL</button>
+                <div className="pane" style={{flex: "1 1 auto"}}>
+                    <div className="pane-head"><span>Watchlist</span><span>{rows.length || ""}</span></div>
+                    <div className="pane-body" role="listbox" aria-label="Watchlist">
+                        {rows.length === 0 && (
+                            <p className="pane-note">No prices yet. The feed refreshes every minute.</p>
+                        )}
+                        {rows.map(p => (
+                            <div
+                                key={p.symbol}
+                                role="option"
+                                tabIndex={0}
+                                aria-selected={p.symbol === selected}
+                                className={`quote ${flashes[p.symbol] || ""}`}
+                                onClick={() => onSelect(p.symbol)}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(p.symbol); }
+                                }}
+                            >
+                                <span className="tick">{p.symbol}</span>
+                                <span className="quote-price">{amount(p.price)}</span>
+                            </div>
+                        ))}
                     </div>
-                    <input
-                        type="number"
-                        value={shares}
-                        onChange={(e) => setShares(e.target.value)}
-                        min="1"
-                        placeholder="Shares"
-                    />
-                    <button className={side === "BUY" ? "btn-buy" : "btn-sell"} onClick={trade}>
-                        Execute {side}
-                    </button>
-                    {message && (
-                        <p className={success ? "green" : "red"} style={{marginTop: "8px", fontSize: "13px"}}>
-                            {message}
-                        </p>
+                </div>
+            );
+        }
+
+        function Chart({symbol, last}) {
+            const containerRef = React.useRef(null);
+            const [bars, setBars] = React.useState([]);
+            const [note, setNote] = React.useState("");
+
+            // Bars come from our own server, which holds the Alpaca credentials.
+            // The cancelled flag stops a slow response for an old symbol from
+            // overwriting the one just picked.
+            React.useEffect(() => {
+                let cancelled = false;
+                setNote("");
+
+                api(`/api/bars/${symbol}`)
+                    .then(data => {
+                        if (cancelled) return;
+                        const list = asArray(data && data.bars && data.bars[symbol]);
+                        setBars(list);
+                        if (list.length === 0) setNote("No recent bars");
+                    })
+                    .catch(e => {
+                        if (cancelled) return;
+                        setBars([]);
+                        setNote(e.message);
+                    });
+
+                return () => { cancelled = true; };
+            }, [symbol]);
+
+            // Rendered into a ref rather than a shared element id, so overlapping
+            // renders cannot stack two charts into the same node.
+            React.useEffect(() => {
+                const el = containerRef.current;
+                if (!el || bars.length === 0) return;
+
+                const chart = LightweightCharts.createChart(el, {
+                    width: el.clientWidth,
+                    height: el.clientHeight,
+                    layout: { background: {color: "#071012"}, textColor: "#6f8a8e", fontSize: 10,
+                              fontFamily: "'IBM Plex Mono', monospace" },
+                    grid: { vertLines: {color: "#122326"}, horzLines: {color: "#122326"} },
+                    rightPriceScale: { borderColor: "#192e32" },
+                    timeScale: { borderColor: "#192e32" },
+                    crosshair: { vertLine: {color: "#e8b34a", width: 1, style: 3, labelBackgroundColor: "#e8b34a"},
+                                 horzLine: {color: "#e8b34a", width: 1, style: 3, labelBackgroundColor: "#e8b34a"} }
+                });
+
+                const series = chart.addCandlestickSeries({
+                    upColor: "#2fcf8f", downColor: "#f2555a",
+                    borderUpColor: "#2fcf8f", borderDownColor: "#f2555a",
+                    wickUpColor: "#2fcf8f", wickDownColor: "#f2555a"
+                });
+
+                series.setData(
+                    bars.map(b => ({
+                        time: Math.floor(new Date(b.t).getTime() / 1000),
+                        open: b.o, high: b.h, low: b.l, close: b.c
+                    }))
+                    .filter(p => isFinite(p.time))
+                    .sort((a, b) => a.time - b.time)
+                );
+
+                chart.timeScale().fitContent();
+
+                const resize = () => chart.applyOptions({width: el.clientWidth, height: el.clientHeight});
+                const observer = new ResizeObserver(resize);
+                observer.observe(el);
+
+                return () => { observer.disconnect(); chart.remove(); };
+            }, [bars]);
+
+            return (
+                <div className="pane chart-pane">
+                    <div className="chart-head">
+                        <span className="chart-symbol">{symbol}</span>
+                        <span className="chart-last">{amount(last)}</span>
+                        <span className="chart-meta">{bars.length > 0 ? "1 hour candles, last 100 hours" : ""}</span>
+                    </div>
+                    {bars.length === 0 ? (
+                        <div className="chart-empty">
+                            <span className="chart-empty-head">{note || "Loading candles"}</span>
+                            {note && (
+                                <span className="chart-empty-hint">
+                                    Candles come from Alpaca. Add <code>ALPACA_API_KEY</code> and{" "}
+                                    <code>ALPACA_SECRET_KEY</code> to <code>.env</code> and restart.
+                                    Prices and trading work without them.
+                                </span>
+                            )}
+                        </div>
+                    ) : (
+                        <div ref={containerRef} className="chart-canvas"></div>
                     )}
                 </div>
             );
         }
 
-        function Portfolio({userId, refresh}) {
-            const [portfolio, setPortfolio] = React.useState(null);
+        function OrderTicket({symbol, last, onFilled}) {
+            const [side, setSide]   = React.useState("BUY");
+            const [size, setSize]   = React.useState("1");
+            const [msg, setMsg]     = React.useState(null);
+            const [busy, setBusy]   = React.useState(false);
 
-            async function fetchPortfolio() {
-                const response = await fetch(`${API}/api/portfolio/${userId}`);
-                const data = await response.json();
-                setPortfolio(data);
-            }
+            const parsed = parseFloat(size);
+            const valid = isFinite(parsed) && parsed > 0;
+            const estimate = valid && isNum(last) ? parsed * last : null;
 
-            React.useEffect(() => {
-                fetchPortfolio();
-            }, [refresh]);
+            async function submit(event) {
+                event.preventDefault();
 
-            if (!portfolio) return <div className="section">Loading portfolio...</div>;
+                if (!valid) {
+                    setMsg({ok: false, text: "Enter a quantity above zero"});
+                    return;
+                }
 
-            return (
-                <div className="section">
-                    <h2>Portfolio</h2>
-                    <p>Cash: ${portfolio.balance.toFixed(2)}</p>
-                    <p>Equity: ${portfolio.equity.toFixed(2)}</p>
-                    <p>Total Value: ${portfolio.total_value.toFixed(2)}</p>
-                    <p>
-                        PnL:{" "}
-                        <span className={portfolio.pnl >= 0 ? "green" : "red"}>
-                            ${portfolio.pnl.toFixed(2)}
-                        </span>
-                    </p>
-                    <h3>Holdings</h3>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Symbol</th>
-                                <th>Shares</th>
-                                <th>Price</th>
-                                <th>Value</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {portfolio.holdings.map(h => (
-                                <tr key={h.symbol}>
-                                    <td>{h.symbol}</td>
-                                    <td>{h.shares}</td>
-                                    <td>${h.current_price.toFixed(2)}</td>
-                                    <td>${h.value.toFixed(2)}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            );
-        }
+                setMsg(null);
+                setBusy(true);
 
-        function TradeHistory({ userId, refresh }) {
-            const [history, setHistory] = React.useState([]);
-
-            async function fetchHistory() {
-                const response = await fetch(`${API}/api/history/${userId}`);
-                const data = await response.json();
-                setHistory(data);
-            }
-
-            React.useEffect(() => {
-                fetchHistory();
-            }, [refresh]);
-
-            return (
-                <div className="section">
-                    <h2>Trade History</h2>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Symbol</th>
-                                <th>Side</th>
-                                <th>Shares</th>
-                                <th>Price</th>
-                                <th>Total</th>
-                                <th>Time</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {history.map(t => (
-                                <tr key={t.id}>
-                                    <td>{t.symbol}</td>
-                                    <td className={t.side === "BUY" ? "green" : "red"}>
-                                        {t.side}
-                                    </td>
-                                    <td>{t.shares}</td>
-                                    <td>${t.price.toFixed(2)}</td>
-                                    <td>${t.total.toFixed(2)}</td>
-                                    <td>{t.executed_at.substring(0, 16)}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            );
-        }
-
-        function Leaderboard({ currentUsername }) {
-            const [board, setBoard] = React.useState([]);
-
-            async function fetchLeaderboard() {
-                const response = await fetch(`${API}/api/leaderboard`);
-                const data = await response.json();
-                setBoard(data);
-            }
-
-            React.useEffect(() => {
-                fetchLeaderboard();
-                const interval = setInterval(fetchLeaderboard, 30000);
-                return () => clearInterval(interval);
-            }, []);
-
-            return (
-                <div className="section">
-                    <h2>Leaderboard</h2>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Rank</th>
-                                <th>Username</th>
-                                <th>Total Value</th>
-                                <th>PnL</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {board.map(entry => (
-                                <tr
-                                    key={entry.username}
-                                    className={entry.username === currentUsername ? "highlight" : ""}
-                                >
-                                    <td>{entry.rank}</td>
-                                    <td>{entry.username}</td>
-                                    <td>${entry.total_value.toFixed(2)}</td>
-                                    <td className={entry.pnl >= 0 ? "green" : "red"}>
-                                        ${entry.pnl.toFixed(2)}
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            );
-        }
-
-        function StockDropdown({ prices, selectedSymbol, onSelect }) {
-            return (
-                <div>
-                    <select
-                        value={selectedSymbol}
-                        onChange={(e) => onSelect(e.target.value)}
-                        style={{marginBottom: "12px"}}
-                    >
-                        {prices.map(p => (
-                            <option key={p.symbol} value={p.symbol}>
-                                {p.symbol} — ${p.price.toFixed(2)}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-            );
-        }
-
-        function PriceChart({ symbol, apiKey, secretKey }) {
-            const [bars, setBars] = React.useState([]);
-
-            async function fetchBars() {
-                const url = `https://data.alpaca.markets/v2/stocks/bars?symbols=${symbol}&timeframe=1Hour&limit=100&feed=iex`;
-                const response = await fetch(url, {
-                    headers: {
-                        "APCA-API-KEY-ID": apiKey,
-                        "APCA-API-SECRET-KEY": secretKey
-                    }
-                });
-                const data = await response.json();
-                if (data.bars && data.bars[symbol]) {
-                    setBars(data.bars[symbol]);
+                try {
+                    const data = await api("/api/trade", {
+                        method: "POST",
+                        body: JSON.stringify({symbol: symbol, side: side, shares: parsed})
+                    });
+                    setMsg({ok: true, text: `${data.message} · ${qty(parsed)} ${symbol} at ${amount(data.fill_price)}`});
+                    onFilled();
+                } catch (e) {
+                    setMsg({ok: false, text: e.message});
+                } finally {
+                    setBusy(false);
                 }
             }
 
-            React.useEffect(() => {
-                if (apiKey && secretKey) fetchBars();
-            }, [symbol, apiKey, secretKey]);
-
-            React.useEffect(() => {
-                if (bars.length === 0) return;
-
-                const chartEl = document.getElementById("price-chart");
-                if (!chartEl) return;
-
-                const chart = LightweightCharts.createChart(chartEl, {
-                    width: chartEl.clientWidth,
-                    height: 350,
-                    layout: {
-                        background: { color: "#161b22" },
-                        textColor: "#e6edf3"
-                    },
-                    grid: {
-                        vertLines: { color: "#21262d" },
-                        horzLines: { color: "#21262d" }
-                    }
-                });
-
-                const candleSeries = chart.addCandlestickSeries({
-                    upColor: "#3fb950",
-                    downColor: "#f85149",
-                    borderVisible: false,
-                    wickUpColor: "#3fb950",
-                    wickDownColor: "#f85149"
-                });
-
-                const chartData = bars.map(bar => ({
-                    time: Math.floor(new Date(bar.t).getTime() / 1000),
-                    open: bar.o,
-                    high: bar.h,
-                    low: bar.l,
-                    close: bar.c
-                }));
-
-                candleSeries.setData(chartData);
-                chart.timeScale().fitContent();
-
-                return () => chart.remove();
-            }, [bars]);
-
             return (
-                <div>
-                    <div className="chart-header">
-                        <span style={{fontWeight: "bold", fontSize: "18px"}}>{symbol}</span>
+                <form className="ticket" onSubmit={submit}>
+                    <span className="ticket-label">Order</span>
+
+                    <div className="side-toggle">
+                        <button type="button" className="side-btn buy"
+                                aria-pressed={side === "BUY"} onClick={() => setSide("BUY")}>Buy</button>
+                        <button type="button" className="side-btn sell"
+                                aria-pressed={side === "SELL"} onClick={() => setSide("SELL")}>Sell</button>
                     </div>
-                    <div id="price-chart" style={{width: "100%", height: "350px"}}></div>
+
+                    <span className="tick">{symbol}</span>
+
+                    <label className="ticket-label" htmlFor="qty">Qty</label>
+                    <input id="qty" className="qty-input" type="number" min="0" step="any"
+                           value={size} onChange={(e) => setSize(e.target.value)} />
+
+                    <span className="estimate">
+                        Est.<span className="num">{estimate === null ? "—" : amount(estimate)}</span>
+                    </span>
+
+                    <button type="submit" className={`execute ${side === "BUY" ? "buy" : "sell"}`} disabled={busy}>
+                        {busy ? "Working" : (side === "BUY" ? "Buy" : "Sell")}
+                    </button>
+
+                    {msg && <span className={`ticket-msg ${msg.ok ? "up" : "down"}`}>{msg.text}</span>}
+                </form>
+            );
+        }
+
+        function Positions({portfolio, error, onPick}) {
+            const rows = asArray(portfolio && portfolio.holdings);
+
+            // Sized to its content and never shrunk, so every holding stays
+            // visible. There are only ten tradeable symbols, so this tops out
+            // around ten rows; the cap is just a guard on a short window.
+            return (
+                <div className="pane" style={{flex: "0 0 auto", maxHeight: "68%"}}>
+                    <div className="pane-head">
+                        <span>Positions</span>
+                        <span className="num dim">{isNum(portfolio && portfolio.equity) ? amount(portfolio.equity) : ""}</span>
+                    </div>
+                    <div className="pane-body">
+                        <Alert message={error} />
+                        {portfolio && rows.length === 0 && (
+                            <p className="pane-note">Flat. Pick a symbol on the left and buy it from the ticket below the chart.</p>
+                        )}
+                        {rows.length > 0 && (
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Symbol</th>
+                                        <th className="r">Qty</th>
+                                        <th className="r">Last</th>
+                                        <th className="r">Value</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {rows.map(h => (
+                                        <tr key={h.symbol} onClick={() => onPick(h.symbol)} style={{cursor: "pointer"}}>
+                                            <td className="tick">{h.symbol}</td>
+                                            <td className="num">{qty(h.shares)}</td>
+                                            <td className="num">{amount(h.current_price)}</td>
+                                            <td className="num">{amount(h.value)}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
                 </div>
             );
         }
 
-        function PortfolioSummary({ userId, refresh }) {
-            const [portfolio, setPortfolio] = React.useState(null);
+        function Blotter({refresh, onPick}) {
+            const {data, error} = useApi("/api/history", [refresh]);
+            const rows = asArray(data);
 
-            async function fetchPortfolio() {
-                const response = await fetch(`${API}/api/portfolio/${userId}`);
-                const data = await response.json();
-                setPortfolio(data);
-            }
-
-            React.useEffect(() => {
-                fetchPortfolio();
-            }, [refresh]);
-
-            if (!portfolio) return <div style={{color: "#8b949e", fontSize: "13px"}}>Loading...</div>;
-
+            // Takes whatever is left over and scrolls. The history is long and
+            // rarely the thing you are looking at.
             return (
-                <div>
-                    <div className="stat-box">
-                        <div className="stat-label">Cash</div>
-                        <div className="stat-value">${portfolio.balance.toFixed(2)}</div>
-                    </div>
-                    <div className="stat-box">
-                        <div className="stat-label">Equity</div>
-                        <div className="stat-value">${portfolio.equity.toFixed(2)}</div>
-                    </div>
-                    <div className="stat-box">
-                        <div className="stat-label">Total Value</div>
-                        <div className="stat-value">${portfolio.total_value.toFixed(2)}</div>
-                    </div>
-                    <div className="stat-box">
-                        <div className="stat-label">PnL</div>
-                        <div className={`stat-value ${portfolio.pnl >= 0 ? "green" : "red"}`}>
-                            ${portfolio.pnl.toFixed(2)}
-                        </div>
+                <div className="pane" style={{flex: "1 1 auto", minHeight: 0}}>
+                    <div className="pane-head"><span>Blotter</span><span className="dim">{rows.length || ""}</span></div>
+                    <div className="pane-body">
+                        <Alert message={error} />
+                        {data && rows.length === 0 && <p className="pane-note">No fills yet.</p>}
+                        {rows.length > 0 && (
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Time</th>
+                                        <th>Side</th>
+                                        <th>Symbol</th>
+                                        <th className="r">Qty</th>
+                                        <th className="r">Price</th>
+                                        <th className="r">Value</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {rows.map(t => (
+                                        <tr key={t.id} onClick={() => onPick(t.symbol)} style={{cursor: "pointer"}}>
+                                            <td className="num dim" style={{textAlign: "left"}}>{clock(t.executed_at)}</td>
+                                            <td className={t.side === "BUY" ? "up" : "down"} style={{fontWeight: 600}}>
+                                                {t.side === "BUY" ? "Buy" : "Sell"}
+                                            </td>
+                                            <td className="tick">{t.symbol}</td>
+                                            <td className="num">{qty(t.shares)}</td>
+                                            <td className="num">{amount(t.price)}</td>
+                                            <td className="num">{amount(t.total)}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
                     </div>
                 </div>
             );
         }
 
         function App() {
-            const [userId, setUserId]                   = React.useState(null);
-            const [username, setUsername]               = React.useState("");
-            const [tradeSymbol, setTradeSymbol]         = React.useState("AAPL");
-            const [refresh, setRefresh]                 = React.useState(0);
-            const [prices, setPrices]                   = React.useState([]);
-            const [selectedSymbol, setSelectedSymbol]   = React.useState("AAPL");
-            const [alpacaKey, setAlpacaKey]             = React.useState("");
-            const [alpacaSecret, setAlpacaSecret]       = React.useState("");
+            const [symbol, setSymbol]   = React.useState("AAPL");
+            const [refresh, setRefresh] = React.useState(0);
+            const [flashes, setFlashes] = React.useState({});
 
+            const priceState = useApi("/api/prices", [], 30000);
+            const prices = asArray(priceState.data);
+
+            // Prices move, so the portfolio is worth re-reading on the same cadence,
+            // not only after a fill.
+            const portfolioState = useApi("/api/portfolio", [refresh], 30000);
+            const portfolio = portfolioState.data;
+
+            // Cheap: the server answers this from a cached value the price
+            // thread refreshes, so polling it costs nothing upstream.
+            const marketState = useApi("/api/market", [], 60000);
+            const market = marketState.data;
+
+            // Flag whichever quotes actually changed, so the eye is drawn to the
+            // movement rather than having to diff the column.
+            const previous = React.useRef({});
             React.useEffect(() => {
-                if (!userId) return;
+                if (prices.length === 0) return;
 
-                // fetch config
-                fetch(`${API}/api/config`)
-                    .then(r => r.json())
-                    .then(data => {
-                        setAlpacaKey(data.alpaca_key);
-                        setAlpacaSecret(data.alpaca_secret);
-                    });
+                const next = {};
+                prices.forEach(p => {
+                    const before = previous.current[p.symbol];
+                    if (isNum(before) && isNum(p.price) && before !== p.price) {
+                        next[p.symbol] = p.price > before ? "flash-up" : "flash-down";
+                    }
+                    previous.current[p.symbol] = p.price;
+                });
 
-                // fetch prices
-                async function loadPrices() {
-                    const r = await fetch(`${API}/api/prices`);
-                    const data = await r.json();
-                    setPrices(data);
-                }
+                if (Object.keys(next).length === 0) return;
 
-                loadPrices();
-                const interval = setInterval(loadPrices, 30000);
-                return () => clearInterval(interval);
-            }, [userId]);
+                setFlashes(next);
+                const timer = setTimeout(() => setFlashes({}), 900);
+                return () => clearTimeout(timer);
+            }, [priceState.data]);
 
-            function handleRegister(id, name) {
-                setUserId(id);
-                setUsername(name);
-            }
+            // Keep the selection pointing at something that actually exists.
+            React.useEffect(() => {
+                if (prices.length === 0) return;
+                if (!prices.some(p => p.symbol === symbol)) setSymbol(prices[0].symbol);
+            }, [priceState.data]);
 
-            function handleTradeComplete() {
-                setRefresh(r => r + 1);
-            }
+            const quote = prices.find(p => p.symbol === symbol);
+            const last  = quote ? quote.price : null;
 
-            function handleBuy(symbol) {
-                setTradeSymbol(symbol);
-            }
-
-            if (!userId) {
-                return <RegisterForm onRegister={handleRegister} />;
-            }
+            const total = portfolio ? portfolio.total_value : null;
+            const pnl   = portfolio ? portfolio.pnl : null;
+            const stamp = prices.length > 0 ? clock(prices[0].updated_at) : "—";
 
             return (
-                <div style={{display: "flex", flexDirection: "column", height: "100vh"}}>
-                    <div className="header">
-                        <h1>Trading Sim</h1>
-                        <span style={{color: "#8b949e"}}>Welcome, <strong style={{color: "#e6edf3"}}>{username}</strong></span>
-                    </div>
-                    <div className="main-layout">
-                        <div className="sidebar">
-                            <p className="section-title">Markets</p>
-                            <StockDropdown
+                <div className="terminal">
+                    <header className="topbar">
+                        <div className="topbar-left">
+                            <span className="brand">Trading Sim</span>
+                            <MarketStatus market={market} />
+                        </div>
+                        <div className="headline">
+                            <span className="headline-label">Account value</span>
+                            <span className="headline-value">{amount(total)}</span>
+                            {isNum(pnl) && (
+                                <span className={`headline-pnl ${pnlClass(pnl)}`}>
+                                    {pnl === 0 ? "" : (pnl < 0 ? "▼ " : "▲ ")}{signed(pnl)}
+                                </span>
+                            )}
+                        </div>
+                    </header>
+
+                    <div className="desk">
+                        <div className="col">
+                            {priceState.error && <Alert message={priceState.error} />}
+                            <Watchlist
                                 prices={prices}
-                                selectedSymbol={selectedSymbol}
-                                onSelect={setSelectedSymbol}
+                                selected={symbol}
+                                onSelect={setSymbol}
+                                flashes={flashes}
                             />
-                            <p className="section-title">Trade</p>
-                            <TradeForm
-                                userId={userId}
-                                symbol={selectedSymbol}
-                                onTradeComplete={handleTradeComplete}
-                            />
-                            <p className="section-title">Account</p>
-                            <PortfolioSummary userId={userId} refresh={refresh} />
                         </div>
-                        <div className="main-content">
-                            <div className="chart-container">
-                                <PriceChart
-                                    symbol={selectedSymbol}
-                                    apiKey={alpacaKey}
-                                    secretKey={alpacaSecret}
-                                />
-                            </div>
-                            <div className="bottom-panels">
-                                <div className="panel">
-                                    <Portfolio userId={userId} refresh={refresh} />
-                                </div>
-                                <div className="panel">
-                                    <TradeHistory userId={userId} refresh={refresh} />
-                                </div>
-                                <div className="panel">
-                                    <Leaderboard currentUsername={username} />
-                                </div>
-                            </div>
+
+                        <div className="col">
+                            <Chart symbol={symbol} last={last} />
+                            <OrderTicket
+                                symbol={symbol}
+                                last={last}
+                                onFilled={() => setRefresh(r => r + 1)}
+                            />
+                        </div>
+
+                        <div className="col">
+                            <Positions
+                                portfolio={portfolio}
+                                error={portfolioState.error}
+                                onPick={setSymbol}
+                            />
+                            <Blotter refresh={refresh} onPick={setSymbol} />
                         </div>
                     </div>
+
+                    <footer className="statusbar">
+                        <span className="stat-pair">Cash <span className="num">{amount(portfolio && portfolio.balance)}</span></span>
+                        <span className="stat-pair">Equity <span className="num">{amount(portfolio && portfolio.equity)}</span></span>
+                        <span className="stat-pair">Positions <span className="num">{portfolio ? asArray(portfolio.holdings).length : "—"}</span></span>
+                        <span className="spacer"></span>
+                        <span className="stat-pair">
+                            {market && market.known && !market.is_open ? "Last close, fetched" : "Feed checked"}
+                            <span className="num">{stamp}</span>
+                        </span>
+                    </footer>
                 </div>
             );
         }

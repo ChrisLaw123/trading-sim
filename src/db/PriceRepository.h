@@ -15,9 +15,9 @@ public:
     void upsert(const std::string& symbol, double price) {
         pqxx::work txn(db_.conn());
 
-        txn.exec_params( 
+        txn.exec_params(
             "INSERT INTO prices (symbol, price, updated_at) "
-            "VALUES ($1, $2, now()) "
+            "VALUES ($1, $2::numeric, now()) "
             "ON CONFLICT (symbol) "
             "DO UPDATE SET price = EXCLUDED.price, updated_at = now()",
             symbol, price
@@ -40,11 +40,7 @@ public:
         std::vector<Price> stock_prices;
 
         for (auto row : result) {
-            Price p;
-            p.symbol        = row[0].as<std::string>();
-            p.price         = row[1].as<double>();
-            p.updated_at    = row[2].as<std::string>();
-            stock_prices.push_back(p);
+            stock_prices.push_back(read_price(row));
         }
 
         return stock_prices;
@@ -52,7 +48,12 @@ public:
 
     std::optional<Price> get(const std::string& symbol) {
         pqxx::work txn(db_.conn());
+        auto price = get(txn, symbol);
+        txn.commit();
+        return price;
+    }
 
+    std::optional<Price> get(pqxx::work& txn, const std::string& symbol) {
         auto result = txn.exec_params(
             "SELECT symbol, price::float8, updated_at::text "
             "FROM prices "
@@ -60,20 +61,21 @@ public:
             symbol
         );
 
-        txn.commit();
-
-        if(result.empty()) {
+        if (result.empty()) {
             return std::nullopt;
         }
 
-        Price p;
-        p.symbol        = result[0][0].as<std::string>();
-        p.price         = result[0][1].as<double>();
-        p.updated_at    = result[0][2].as<std::string>();
-        
-        return p;
+        return read_price(result[0]);
     }
 
 private:
+    static Price read_price(const pqxx::row& row) {
+        Price p;
+        p.symbol     = row[0].as<std::string>();
+        p.price      = row[1].as<double>();
+        p.updated_at = row[2].as<std::string>();
+        return p;
+    }
+
     Database& db_;
 };
