@@ -201,6 +201,10 @@ requests cannot spend the same cash twice or sell into a negative position.
 
 ## Manual setup
 
+You do not need this section if you use `./run.sh`, which does all of it for you
+with its own database. Follow these steps only to build by hand or to run against a
+PostgreSQL you manage yourself.
+
 ### 1. Clone the repo
 
 ```bash
@@ -300,9 +304,12 @@ automatically if GoogleTest is not installed.
 ### 7. Run
 
 ```bash
-sudo service postgresql start
+sudo service postgresql start   # the system PostgreSQL from step 3
 ./build/trading_sim
 ```
+
+This runs whatever is in `build/` and does not rebuild it, so run step 5 again after
+pulling changes. `./run.sh` rebuilds automatically when sources change.
 
 Open your browser at `http://localhost:8080`. The server looks for `.env` in the working
 directory, so run it from wherever your `.env` lives; it finds `frontend/index.html`
